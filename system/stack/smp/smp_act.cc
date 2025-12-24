@@ -1106,6 +1106,8 @@ void smp_proc_srk_info(tSMP_CB* p_cb, tSMP_INT_DATA* p_data) {
 
   smp_update_key_mask(p_cb, SMP_SEC_KEY_TYPE_CSRK, true);
 
+  smp_key_distribution_by_transport(p_cb, NULL);
+
   /* save CSRK to security record */
   tBTM_LE_KEY_VALUE le_key = {
       .pcsrk_key =
@@ -1124,7 +1126,6 @@ void smp_proc_srk_info(tSMP_CB* p_cb, tSMP_INT_DATA* p_data) {
   if ((p_cb->peer_auth_req & SMP_AUTH_BOND) &&
       (p_cb->loc_auth_req & SMP_AUTH_BOND))
     btm_sec_save_le_key(p_cb->pairing_bda, BTM_LE_KEY_PCSRK, &le_key, true);
-  smp_key_distribution_by_transport(p_cb, NULL);
 }
 
 /*******************************************************************************
@@ -1945,6 +1946,16 @@ void smp_process_secure_connection_oob_data(tSMP_CB* p_cb,
   } else {
     SMP_TRACE_EVENT("%s: local OOB randomizer is absent", __func__);
     p_cb->local_random = {0};
+  }
+
+  if (p_cb->peer_oob_flag == SMP_OOB_PRESENT && !p_sc_oob_data->loc_oob_data.present) {
+    SMP_TRACE_WARNING(
+        "local OOB data is not present but peer claims to have received it; dropping "
+        "connection", __func__);
+    tSMP_INT_DATA smp_int_data{};
+    smp_int_data.status = SMP_OOB_FAIL;
+    smp_sm_event(p_cb, SMP_AUTH_CMPL_EVT, &smp_int_data);
+    return;
   }
 
   if (!p_sc_oob_data->peer_oob_data.present) {
